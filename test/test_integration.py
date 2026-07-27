@@ -96,7 +96,14 @@ def test_full_pipeline_webcam():
         print("  - 'Navigate' / 'Stop navigation' - Control obstacle guidance")
         print("  - 'List all items' - Show remembered objects")
     
-    cap = cv2.VideoCapture(0)
+    # Try DirectShow first on Windows, fallback to default
+    if os.name == 'nt':
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(0)
+    else:
+        cap = cv2.VideoCapture(0)
+        
     if not cap.isOpened():
         print("✗ Could not open webcam")
         db.close()
@@ -104,6 +111,8 @@ def test_full_pipeline_webcam():
     
     frame_count = 0
     start_time = time.time()
+    elapsed = 0
+    fps = 0
     audio_enabled = True
     navigation_enabled = True  # Enable spatial navigation by default
     voice_mode_enabled = voice_initialized  # Enable voice if available
