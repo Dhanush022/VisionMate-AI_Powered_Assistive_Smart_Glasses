@@ -455,7 +455,7 @@ class LaptopMLServer:
 
     def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
         default_host = getattr(config, 'SERVER_HOST', '0.0.0.0') if config else '0.0.0.0'
-        default_port = getattr(config, 'SERVER_PORT', 8081) if config else 8081
+        default_port = getattr(config, 'SERVER_PORT', 8080) if config else 8080
         if isinstance(host, int) and port is None:
             port = host
             host = default_host
@@ -984,11 +984,9 @@ class LaptopMLServer:
 
     def get_rolling_fps(self) -> float:
         """Return instantaneous rolling FPS over the last 30 frames."""
-        if len(self._rolling_frame_times) < 2:
-            return 0.0
-        dt = self._rolling_frame_times[-1] - self._rolling_frame_times[0]
+        elapsed = self._rolling_frame_times[-1] - self._rolling_frame_times[0]
         n_frames = len(self._rolling_frame_times) - 1
-        return n_frames / dt if dt > 0 else 0.0
+        return n_frames / max(elapsed, 0.001)
 
     def get_rolling_stage_avg(self, stage: str) -> float:
         """Return rolling average duration in ms for the given stage over the last 30 frames (0.0 when unused)."""
@@ -3232,46 +3230,207 @@ class LaptopMLServer:
 
         cv2.imshow('VisionMate - Full Pipeline', display)
         key = cv2.waitKey(1) & 0xFF
-        if getattr(config, 'KEYBOARD_FALLBACK', False):
-            self._handle_keyboard_fallback(key, frame)
+        self._handle_keyboard(key, frame)
 
-    # ─── Minimal Debug Hotkey (only when config.KEYBOARD_FALLBACK is True) ────
+    # ─── Keyboard Controls (ALL from test_integration.py) ──────
 
-    def _handle_keyboard_fallback(self, key, frame):
-        """Minimal debug hotkey when config.KEYBOARD_FALLBACK is True."""
+    def _handle_keyboard(self, key, frame):
+        """Handle all keyboard controls"""
         if key == 255:
-            return
+            return  # No key pressed
+
         if key == ord('q'):
             logger.info("Debug hotkey: closing display window")
             self.show_display = False
             cv2.destroyAllWindows()
 
+        elif key == ord('e'):
+            # Enroll face
+            name = input("\nEnter name for face enrollment: ").strip()
+            if name:
+                success = self.face_recognizer.enroll_face(frame, name)
+                if success:
+                    logger.info(f"[OK] Enrolled face: {name}")
+                    if self.audio_enabled:
+                        self.audio.speak_social(f"Enrolled {name}")
+                else:
+                    logger.warning("No face detected in frame")
+
+        elif key == ord('r'):
+            # Remember object
+            if not self.enrollment_active:
+                if self.current_objects:
+                    print("\nDetected objects:")
+                    for i, obj in enumerate(self.current_objects):
+                        print(f"  {i + 1}. {obj['class_name']}")
+                    try:
+                        idx = int(input("Select object number: ").strip()) - 1
+                        if 0 <= idx < len(self.current_objects):
+                            obj = self.current_objects[idx]
+                            custom_name = input(
+                                "Enter custom name (e.g., 'house keys'): "
+                            ).strip()
+                            if custom_name:
+                                try:
+                                    self.object_memory.start_enrollment(
+                                        custom_name, obj['class_name']
+                                    )
+                                    self.enrollment_active = True
+                                    self.enrollment_target_obj = {
+                                        'custom_name': custom_name,
+                                        'yolo_class': obj['class_name']
+                                    }
+                                    self.enrollment_frames_captured = 0
+                                    logger.info(
+                                        f"[OK] Enrolling '{custom_name}' - "
+                                        f"keep in view for 5 frames..."
+                                    )
+                                except ValueError as e:
+                                    print(f"[FAIL] {e}")
+                    except (ValueError, IndexError):
+                        print("[FAIL] Invalid selection")
+                else:
+                    print("[FAIL] No objects detected")
+
+        elif key == ord('l'):
+            # List remembered objects
+            remembered_list = self.object_memory.list_remembered_objects()
+            print(f"\nRemembered Objects ({len(remembered_list)}):")
+            if remembered_list:
+                for name, yolo_class in remembered_list:
+                    print(f"  - {name} ({yolo_class})")
+            else:
+                print("  (none)")
+
+        elif key == ord('f'):
+            # Find item/object
+            item = input("\nEnter item/object to find: ").strip()
+            if item:
+                location = self.object_memory.get_object_location(item)
+                if location:
+                    nearby = (location['context'].get('nearby_objects', [])
+                              if location['context'] else [])
+                    nearby_str = f" near {', '.join(nearby)}" if nearby else ""
+                    msg = f"Your {item} last seen{nearby_str}"
+                    print(f"[OK] {msg}")
+                    print(f"  Time: {location['timestamp']}")
+                    if location.get('gps_lat') is not None and location.get('gps_lon') is not None:
+                        print(f"  GPS: {location['gps_lat']:.6f}, {location['gps_lon']:.6f}")
+                    else:
+                        print("  GPS: not recorded for this sighting")
+                    if self.audio_enabled:
+                        self.audio.speak_navigational(msg)
+                else:
+                    loc = self.item_tracker.query_item_location(item)
+                    if loc:
+                        msg = f"Your {item} are on the {loc}"
+                        print(f"[OK] {msg}")
+                        if self.audio_enabled:
+                            self.audio.speak_navigational(msg)
+                    else:
+                        print(f"[FAIL] Haven't seen {item}")
+
+        elif key == ord('a'):
+            self.audio_enabled = not self.audio_enabled
+            logger.info(f"Audio: {'ON' if self.audio_enabled else 'OFF'}")
+
+        elif key == ord('n'):
+            self.navigation_enabled = not self.navigation_enabled
+            logger.info(
+                f"Navigation: {'ON' if self.navigation_enabled else 'OFF'}"
+            )
+
+        elif key == ord('g'):
+            # GPS Navigation
+            if not self.gps_navigation_active:
+                destination = input(
+                    "\nEnter destination (e.g., 'Majestic'): "
+                ).strip()
+                if destination:
+                    logger.info(f"Starting GPS navigation to {destination}...")
+                    if self.audio_enabled:
+                        self.audio.speak_social(f"Navigating to {destination}")
+                    dest_coords = self.osm_navigator.geocode_address(
+                        destination + ", Bangalore, India"
+                    )
+                    if not dest_coords:
+                        print("[FAIL] Could not find destination")
+                        if self.audio_enabled:
+                            self.audio.speak_status(
+                                "Could not find destination"
+                            )
+                    else:
+                        current_pos = self.gps_tracker.get_position()
+                        if not current_pos:
+                            print("[FAIL] Waiting for GPS signal")
+                        else:
+                            route = self.osm_navigator.get_directions(
+                                current_pos, dest_coords, mode='foot'
+                            )
+                            if route:
+                                self.osm_navigator.current_route = route
+                                self.gps_navigation_active = True
+                                self.gps_nav_step = 0
+                                self.last_gps_announcement = None
+                                print(
+                                    f"[OK] Route: {route['total_distance']}, "
+                                    f"{route['total_duration']}, "
+                                    f"{len(route['steps'])} steps"
+                                )
+                                if self.audio_enabled:
+                                    self.audio.speak_social(
+                                        f"Route found. "
+                                        f"{route['total_distance']}. "
+                                        f"{route['total_duration']}."
+                                    )
+                            else:
+                                print("[FAIL] Could not find route")
+            else:
+                self.gps_navigation_active = False
+                logger.info("GPS navigation stopped")
+                if self.audio_enabled:
+                    self.audio.speak_status("GPS navigation stopped")
+
+        elif key == ord('m'):
+            # Advance mock GPS
+            if config.GPS_MOCK_MODE:
+                self.gps_tracker.advance_mock_position()
+                pos = self.gps_tracker.get_position()
+                if pos:
+                    print(f"Mock GPS → {pos[0]:.6f}, {pos[1]:.6f}")
+            else:
+                print("[WARN] GPS is in REAL mode")
+
+        elif key == ord('v'):
+            # Toggle voice
+            if self.voice_system:
+                self.voice_mode_enabled = not self.voice_mode_enabled
+                status = "ON" if self.voice_mode_enabled else "OFF"
+                logger.info(f"Voice mode: {status}")
+                if self.audio_enabled:
+                    self.audio.speak_status(f"Voice mode {status}")
+            else:
+                print("[WARN] Voice system not available")
+
+        elif key == 32:  # SPACE
+            # Trigger voice input
+            if self.voice_system and self.voice_mode_enabled:
+                logger.info("Listening for voice command...")
+                if self.audio_enabled:
+                    self.audio.speak_status("Listening")
+                self.voice_system.trigger_voice_input()
+            elif not self.voice_system:
+                print("[WARN] Voice system not available")
+            else:
+                print("[WARN] Voice mode OFF - press V to enable")
+
+        elif key == ord('d'):
+            # Show database contents
+            self._show_database_contents()
+
     def _show_database_contents(self):
         """Print database contents (faces, items, remembered objects)"""
         print("\n" + "=" * 60)
-        print("DATABASE CONTENTS")
-        print("=" * 60)
-
-        faces = self.db.get_all_faces()
-        print(f"\nFaces ({len(faces)}):")
-        for face_id, name, _ in faces:
-            print(f"  - {name} (ID: {face_id})")
-
-        items = self.db.get_all_item_locations()
-        print(f"\nItem Locations ({len(items)}):")
-        for item, location, ts in items:
-            print(f"  - {item} on {location} (at {ts})")
-
-        remembered = self.db.get_all_remembered_objects()
-        print(f"\nRemembered Objects ({len(remembered)}):")
-        for obj_id, name, yolo_class in remembered:
-            print(f"  - {name} ({yolo_class}) [ID: {obj_id}]")
-
-        print("=" * 60)
-
-    # ─── Utilities ───────────────────────────────────────────
-
-    def get_local_ip(self):
         """Get laptop's local IP address"""
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -3281,69 +3440,6 @@ class LaptopMLServer:
             return ip
         except Exception:
             return "Unable to determine"
-
-    def _fetch_mobile_location(self):
-        """Fetch location from mobile backend, supporting plain HTTP and self-signed HTTPS"""
-        primary = getattr(self, '_active_mobile_poll_url', self.mobile_backend_poll_url)
-        candidates = [primary]
-        for base in [self.mobile_backend_poll_url]:
-            for scheme in ["https://", "http://"]:
-                for host in ["127.0.0.1", "localhost"]:
-                    url = base
-                    if url.startswith("http://"):
-                        url = scheme + url[7:]
-                    elif url.startswith("https://"):
-                        url = scheme + url[8:]
-                    if "localhost" in url and host == "127.0.0.1":
-                        url = url.replace("localhost", "127.0.0.1")
-                    if url not in candidates:
-                        candidates.append(url)
-
-        last_err = None
-        for url in candidates:
-            try:
-                resp = requests.get(url, timeout=1.5, verify=False)
-                if resp.status_code == 200:
-                    self._active_mobile_poll_url = url
-                    return resp
-            except Exception as e:
-                last_err = e
-        if last_err:
-            raise last_err
-        return None
-
-    async def _poll_mobile_backend_location(self):
-        """Periodically poll mobile_backend.py for phone GPS position updates"""
-        poll_interval = self.mobile_backend_poll_interval
-        while getattr(self, 'running', True):
-            if getattr(config, 'GPS_MOCK_MODE', False) or getattr(config, 'INDOOR_MODE', False):
-                await asyncio.sleep(10.0)
-                continue
-            try:
-                loop = asyncio.get_event_loop()
-                resp = await loop.run_in_executor(None, self._fetch_mobile_location)
-                if resp and resp.status_code == 200:
-                    poll_interval = self.mobile_backend_poll_interval
-                    data = resp.json()
-                    if isinstance(data, dict) and 'latitude' in data and 'longitude' in data:
-                        lat = data['latitude']
-                        lon = data['longitude']
-                        self._poll_count = getattr(self, '_poll_count', 0) + 1
-                        if self._poll_count % 5 == 1:
-                            logger.info(f"Phone GPS poll: source={data.get('source')}")
-                        # Only accept genuine phone fixes. mobile_backend also answers
-                        # with IP/mock fallbacks; treating those as 'phone' would keep
-                        # them looking fresh forever and mask a missing phone report.
-                        if (data.get('source') == 'phone' and lat is not None
-                                and lon is not None and self.gps_tracker):
-                            self.gps_tracker.set_phone_position(lat, lon)
-                else:
-                    poll_interval = min(poll_interval * 1.5, 15.0)
-            except (requests.exceptions.RequestException, Exception) as e:
-                logger.debug(f"Mobile backend location polling: {e}")
-                poll_interval = min(poll_interval * 1.5, 15.0)
-
-            await asyncio.sleep(poll_interval)
 
     async def start_server(self):
         """Start WebSocket server"""
@@ -3391,174 +3487,16 @@ class LaptopMLServer:
         return t
 
     def cleanup(self):
-        """Clean up all resources in ordered sequence."""
-        if getattr(self, '_cleaned_up', False):
-            return
-        self._cleaned_up = True
-
-        def _cleanup_sigint(signum, frame):
-            logger.info("Ctrl+C during cleanup: exiting immediately.")
-            os._exit(0)
-
-        prev_sigint = None
-        try:
-            prev_sigint = signal.signal(signal.SIGINT, _cleanup_sigint)
-        except Exception:
-            pass
-
-        try:
-            self._do_cleanup()
-        except KeyboardInterrupt:
-            logger.info("Ctrl+C during cleanup: exiting immediately.")
-            os._exit(0)
-        finally:
-            if prev_sigint is not None:
-                try:
-                    signal.signal(signal.SIGINT, prev_sigint)
-                except Exception:
-                    pass
-
-    def _do_cleanup(self):
-        telemetry_shutdown_ok = False
-        try:
-            telemetry_shutdown_ok = shutdown_openvino_telemetry()
-        except Exception as e:
-            logger.debug(f"Error calling shutdown_openvino_telemetry: {e}")
-
-        current_th = threading.current_thread()
-        telemetry_threads = [
-            t for t in threading.enumerate()
-            if t.is_alive() and not t.daemon and t != current_th and t.name != "MainThread" and
-            ('ThreadPool' in t.name or 'openvino' in t.name.lower() or 'telemetry' in t.name.lower())
-        ]
-
-        force_exit_delay = 1.0
-        if not telemetry_shutdown_ok or telemetry_threads:
-            logger.info("expected: OpenVINO telemetry thread")
-        self.running = False
-        self.show_display = False
-        if hasattr(self, '_ml_ready_event'):
-            self._ml_ready_event.set()
-        if hasattr(self, 'face_worker') and self.face_worker:
-            try:
-                self.face_worker.stop()
-            except Exception:
-                pass
-        if hasattr(self, '_display_thread') and self._display_thread and self._display_thread.is_alive():
-            try:
-                self._display_thread.join(timeout=0.3)
-            except Exception:
-                pass
-        if hasattr(self, '_ml_thread') and self._ml_thread and self._ml_thread.is_alive():
-            try:
-                self._ml_thread.join(timeout=0.3)
-            except Exception:
-                pass
-
-        # Force exit if process is still alive after force_exit_delay
-        if not getattr(self, '_suppress_force_exit', False) and "pytest" not in sys.modules and "PYTEST_CURRENT_TEST" not in os.environ:
-            self._start_shutdown_watchdog(delay=force_exit_delay, telemetry_info=(not telemetry_shutdown_ok or bool(telemetry_threads)))
-
-        # 1. find_guide.stop() first
-        if hasattr(self, 'find_guide') and self.find_guide:
-            try:
-                self.find_guide.stop()
-            except Exception:
-                pass
-
-        if hasattr(self, 'distance_client') and self.distance_client:
-            try:
-                self.distance_client.stop()
-            except Exception as e:
-                logger.debug(f"Error stopping distance_client: {e}")
-
-        # 2. voice
-        if hasattr(self, 'voice_system') and self.voice_system:
-            try:
-                self.voice_system.stop()
-            except Exception as e:
-                logger.debug(f"Error stopping voice_system: {e}")
-
-        # 3. GPS
-        if hasattr(self, 'gps_tracker') and self.gps_tracker:
-            try:
-                self.gps_tracker.stop()
-            except Exception as e:
-                logger.debug(f"Error stopping gps_tracker: {e}")
-
-        # 4. ultrasonic & obstacle alert
-        if hasattr(self, 'ultrasonic') and self.ultrasonic:
-            try:
-                self.ultrasonic.stop()
-            except Exception as e:
-                logger.debug(f"Error stopping ultrasonic: {e}")
-
-        if hasattr(self, 'obstacle_alerter') and self.obstacle_alerter:
-            try:
-                self.obstacle_alerter.stop()
-            except Exception as e:
-                logger.debug(f"Error stopping obstacle_alerter: {e}")
-
-        # 5. audio
-        if hasattr(self, 'audio') and self.audio:
-            try:
-                self.audio.stop()
-            except Exception as e:
-                logger.debug(f"Error stopping audio: {e}")
-
-        # 6. websocket server
-        if hasattr(self, '_server_stop_future') and self._server_stop_future and not self._server_stop_future.done():
-            try:
-                self._server_stop_future.get_loop().call_soon_threadsafe(self._server_stop_future.cancel)
-            except Exception:
-                pass
-        if hasattr(self, 'server') and self.server:
-            try:
-                self.server.close()
-            except Exception as e:
-                logger.debug(f"Error closing server: {e}")
-
-        # DB and cv2
-        if hasattr(self, 'db') and self.db:
-            try:
-                self.db.close()
-            except Exception as e:
-                logger.debug(f"Error closing db: {e}")
-        try:
-            cv2.destroyAllWindows()
-        except Exception:
-            pass
-
-        # ThreadPoolExecutors clean shutdown
-        try:
-            shutdown_all_executors()
-        except Exception as e:
-            logger.debug(f"Error shutting down executors: {e}")
-
-        # Check and log any non-daemon threads still alive, and make each of them stop (or be a daemon)
-        current_th = threading.current_thread()
-        alive_non_daemons = [
-            t for t in threading.enumerate()
-            if t.is_alive() and not t.daemon and t != current_th and t.name != "MainThread"
-        ]
-        if alive_non_daemons:
-            alive_names = [t.name for t in alive_non_daemons]
-            logger.warning("Shutdown: Non-daemon threads still alive: %s", alive_names)
-            for t in alive_non_daemons:
-                if hasattr(t, 'stop'):
-                    try:
-                        t.stop()
-                    except Exception as e:
-                        logger.debug("Error stopping thread %s: %s", t.name, e)
-                try:
-                    t.daemon = True
-                except Exception:
-                    pass
-        else:
-            logger.info("Shutdown: All background threads stopped cleanly (no non-daemon threads alive)")
-
-
-def print_thread_diagnostics(server=None) -> str:
+        """Clean up all resources"""
+        if self.gps_tracker:
+            self.gps_tracker.stop()
+        if self.ultrasonic:
+            self.ultrasonic.stop()
+        if self.voice_system:
+            self.voice_system.stop()
+        if self.db:
+            self.db.close()
+        cv2.destroyAllWindows()
     """Module-level helper to print and return thread diagnostics."""
     if server is not None:
         return server.print_thread_diagnostics()
@@ -3568,27 +3506,7 @@ def print_thread_diagnostics(server=None) -> str:
 
 def main():
     """Main entry point"""
-    import argparse
-    parser = argparse.ArgumentParser(description="VisionMate Laptop ML Server")
-    default_host = getattr(config, 'SERVER_HOST', '0.0.0.0') if config else "0.0.0.0"
-    default_port = getattr(config, 'SERVER_PORT', 8081) if config else 8081
-    parser.add_argument("--host", default=default_host, help=f"Host address to bind (default: {default_host})")
-    parser.add_argument("--port", type=int, default=default_port, help=f"Port to listen on (default: {default_port})")
-    parser.add_argument("--dry-run", action="store_true", help="Run startup checks, print 'DRY RUN OK' and exit without opening mic, camera, or network")
-    args = parser.parse_args()
-
-    server = LaptopMLServer(host=args.host, port=args.port)
-
-    if args.dry_run:
-        server._suppress_force_exit = True
-        init_ok = server.initialize(dry_run=True)
-        server.cleanup()
-        if init_ok:
-            print("DRY RUN OK")
-            sys.exit(0)
-        else:
-            logger.error("Dry run initialization failed!")
-            sys.exit(1)
+    server = LaptopMLServer(port=8080)
 
     if not server.initialize():
         logger.error("Failed to initialize. Exiting.")
@@ -3599,11 +3517,7 @@ def main():
     except KeyboardInterrupt:
         logger.info("\n\nShutting down server...")
     finally:
-        try:
-            server.cleanup()
-        except KeyboardInterrupt:
-            logger.info("Interrupted during cleanup. Exiting.")
-            os._exit(0)
+        server.cleanup()
         logger.info("Goodbye!")
 
 
