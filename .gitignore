@@ -24,6 +24,7 @@ data/
 
 # Emergency & Firebase Secrets
 firebase_service_account.json
+firebase_service_account.json.example
 emergency_config.json
 
 # Video files (use Git LFS for files > 100MB)
