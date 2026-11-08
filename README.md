@@ -326,9 +326,12 @@ Built by Team NPC's for VisionMate.
 
 ### 📺 Demo Video
 
-![VisionMate Demo Video](demo/Visionmate_demo_video.mp4)
+**Watch the VisionMate Demo**
 
-**Watch the full demo on GitHub:** Click the video above to view it directly on GitHub, or drag `demo/Visionmate_demo_video.mp4` into any modern browser to play locally.
+[![Watch Demo](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](demo/Visionmate_demo_video.mp4)
+
+**Or click the video file directly:**
+- `demo/Visionmate_demo_video.mp4`
 
 **Video highlights (30 seconds):**
 - **0:00-0:10**: System boots, camera indicator lights
@@ -338,9 +341,18 @@ Built by Team NPC's for VisionMate.
 - **0:40-0:50**: Navigation - "Person ahead, clear path"
 - **0:50-1:00**: Summary - "VisionMate: AI-powered assistive smart glasses"
 
-### � Quick Demo Highlights (Without Video)
+#### ⚠️ If the video doesn't play inline:
 
-If you prefer not to watch the full video, here are the key demo moments to showcase:
+GitHub has limitations on inline video playback. If you see "Sorry about that, but we can't show files that are this big right now," don't worry - you can still watch the demo:
+
+1. **Download the video**: Right-click `demo/Visionmate_demo_video.mp4` → "Save link as..."
+2. **Play locally**: Drag the file into VLC, mpv, or any modern browser
+3. **Use command line**: `ffplay demo/Visionmate_demo_video.mp4`
+4. **Raw URL**: `https://github.com/username/VisionMate/raw/main/demo/Visionmate_demo_video.mp4`
+
+### � Quick Demo Highlights (No Video Needed)
+
+If you prefer not to watch the video, here are the key demo moments:
 
 | Feature | Demo Action |
 |---------|-------------|
@@ -366,33 +378,30 @@ The demo video showcases the complete VisionMate pipeline:
 ### 📁 Video File Information
 
 - **File**: `demo/Visionmate_demo_video.mp4`
-- **Size**: ~11MB (optimized for GitHub repo commitment)
+- **Size**: ~11MB
 - **Format**: MP4 with H.264 codec
 - **Duration**: ~60 seconds
-- **Compatible with**: GitHub preview, VLC, mpv, browser playback
 
-### 🖼️ Poster Frame (Optional Enhancement)
+### 🖼️ How to Create a Poster Frame (Optional)
 
-For a clickable thumbnail in the README that links to the video, add `Visionmate_demo_poster.png` (300x200px) to the `demo/` directory:
+For a better visual in the README, create `Visionmate_demo_poster.png` (300x200px) with text like "VisionMate Demo" or a screenshot. Then update the link:
 
 ```markdown
-[![Watch Demo](demo/Visionmate_demo_poster.png)](demo/Visionmate_demo_video.mp4)
+[![VisionMate Demo](demo/Visionmate_demo_poster.png)](demo/Visionmate_demo_video.mp4)
 ```
 
-This creates a poster image that, when clicked, opens the video file in GitHub's native video player or downloads it for local playback.
+**To create a poster image:**
+```bash
+# Extract frame at 00:00:05
+ffmpeg -ss 00:00:05 -i demo/Visionmate_demo_video.mp4 -frames:v 1 -vf "scale=300:200" demo/Visionmate_demo_poster.png
+```
 
 ### 🚀 How to Play the Video
 
 | Method | Description |
 |--------|-------------|
-| **GitHub native** | Click the video file in the repository (`demo/Visionmate_demo_video.mp4`) - GitHub will render the video player |
-| **Local playback** | Drag the file into VLC, mpv, or any modern browser |
+| **GitHub native** | Click the video file (`demo/Visionmate_demo_video.mp4`) - may require download |
+| **Local playback** | Drag into VLC, mpv, or browser |
 | **Command line** | `ffplay demo/Visionmate_demo_video.mp4` |
-| **GitHub raw URL** | `https://github.com/username/VisionMate/raw/main/demo/Visionmate_demo_video.mp4` (replace username/repo) |
-
-### 📝 Notes for Demo Presentations
-
-- The video is optimized to be under 100MB for direct repo commitment
-- If your video is larger, consider using [Git LFS](https://git-lfs.github.com/)
-- GitHub supports MP4, WebM, and MOV formats in repository view
-- For the best experience, keep the video under 1 minute for quick viewing
+| **Raw GitHub URL** | `https://raw.githubusercontent.com/username/VisionMate/main/demo/Visionmate_demo_video.mp4` |
+| **YouTube** | Consider uploading the demo to YouTube for reliable playback |
