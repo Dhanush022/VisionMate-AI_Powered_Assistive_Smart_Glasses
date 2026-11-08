@@ -28,4 +28,3 @@ emergency_config.json
 
 # Video files (use Git LFS for files > 100MB)
 # To enable Git LFS: git lfs track "demo/*.mp4"
-
