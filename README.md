@@ -322,6 +322,77 @@ Alternatively, copy the contents of `firestore.rules` directly into the Firebase
 
 Built by Team NPC's for VisionMate.
 
-## License
+## Demo
 
-MIT License — free for educational and hackathon use.
+### 📺 Demo Video
+
+![VisionMate Demo Video](demo/Visionmate_demo_video.mp4)
+
+**Watch the full demo on GitHub:** Click the video above to view it directly on GitHub, or drag `demo/Visionmate_demo_video.mp4` into any modern browser to play locally.
+
+**Video highlights (30 seconds):**
+- **0:00-0:10**: System boots, camera indicator lights
+- **0:10-0:20**: Object detection - phone/keys detected with labels
+- **0:20-0:30**: Face recognition - "Dhanush recognized"
+- **0:30-0:40**: Object memory - "Remember phone" then "Find phone"
+- **0:40-0:50**: Navigation - "Person ahead, clear path"
+- **0:50-1:00**: Summary - "VisionMate: AI-powered assistive smart glasses"
+
+### � Quick Demo Highlights (Without Video)
+
+If you prefer not to watch the full video, here are the key demo moments to showcase:
+
+| Feature | Demo Action |
+|---------|-------------|
+| **Object Detection** | Wave a phone or keys in front of the camera |
+| **Face Recognition** | Stand in front of the camera for face enrollment/recognition |
+| **Object Memory** | "Remember this phone" → "Find my phone" to locate it |
+| **Navigation** | System announces "Person ahead, chair right" while walking |
+| **GPS Navigation** | Route planning with turn-by-turn voice guidance |
+
+### 📊 System Capabilities Shown in Demo
+
+The demo video showcases the complete VisionMate pipeline:
+
+1. **Real-time object detection** (YOLOv8) with class labeling
+2. **Face recognition** (InsightFace) with cooldown announcements
+3. **Object memory system** - remember and find objects (phone, keys, etc.)
+4. **Spatial navigation** - obstacle avoidance guidance
+5. **GPS navigation** - turn-by-turn directions
+6. **Audio feedback** - priority-based TTS (Emergency > Social > Navigational > Status)
+7. **Wireless mode** - Raspberry Pi streaming over WebSocket to laptop
+8. **Voice command integration** (optional feature)
+
+### 📁 Video File Information
+
+- **File**: `demo/Visionmate_demo_video.mp4`
+- **Size**: ~11MB (optimized for GitHub repo commitment)
+- **Format**: MP4 with H.264 codec
+- **Duration**: ~60 seconds
+- **Compatible with**: GitHub preview, VLC, mpv, browser playback
+
+### 🖼️ Poster Frame (Optional Enhancement)
+
+For a clickable thumbnail in the README that links to the video, add `Visionmate_demo_poster.png` (300x200px) to the `demo/` directory:
+
+```markdown
+[![Watch Demo](demo/Visionmate_demo_poster.png)](demo/Visionmate_demo_video.mp4)
+```
+
+This creates a poster image that, when clicked, opens the video file in GitHub's native video player or downloads it for local playback.
+
+### 🚀 How to Play the Video
+
+| Method | Description |
+|--------|-------------|
+| **GitHub native** | Click the video file in the repository (`demo/Visionmate_demo_video.mp4`) - GitHub will render the video player |
+| **Local playback** | Drag the file into VLC, mpv, or any modern browser |
+| **Command line** | `ffplay demo/Visionmate_demo_video.mp4` |
+| **GitHub raw URL** | `https://github.com/username/VisionMate/raw/main/demo/Visionmate_demo_video.mp4` (replace username/repo) |
+
+### 📝 Notes for Demo Presentations
+
+- The video is optimized to be under 100MB for direct repo commitment
+- If your video is larger, consider using [Git LFS](https://git-lfs.github.com/)
+- GitHub supports MP4, WebM, and MOV formats in repository view
+- For the best experience, keep the video under 1 minute for quick viewing
