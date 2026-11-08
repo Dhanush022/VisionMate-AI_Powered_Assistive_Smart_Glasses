@@ -375,27 +375,6 @@ The demo video showcases the complete VisionMate pipeline:
 7. **Wireless mode** - Raspberry Pi streaming over WebSocket to laptop
 8. **Voice command integration** (optional feature)
 
-### 📁 Video File Information
-
-- **File**: `demo/Visionmate_demo_video.mp4`
-- **Size**: ~11MB
-- **Format**: MP4 with H.264 codec
-- **Duration**: ~60 seconds
-
-### 🖼️ How to Create a Poster Frame (Optional)
-
-For a better visual in the README, create `Visionmate_demo_poster.png` (300x200px) with text like "VisionMate Demo" or a screenshot. Then update the link:
-
-```markdown
-[![VisionMate Demo](demo/Visionmate_demo_poster.png)](demo/Visionmate_demo_video.mp4)
-```
-
-**To create a poster image:**
-```bash
-# Extract frame at 00:00:05
-ffmpeg -ss 00:00:05 -i demo/Visionmate_demo_video.mp4 -frames:v 1 -vf "scale=300:200" demo/Visionmate_demo_poster.png
-```
-
 ### 🚀 How to Play the Video
 
 | Method | Description |
