@@ -222,6 +222,7 @@ exit
 3. Object memory: "Remember phone" → "Find phone"
 4. Face recognition: Recognize someone
 5. GPS navigation: "Navigate to Majestic"
+6. **Play demo video (optional)**: Demonstrate full system capabilities
 
 ---
 
